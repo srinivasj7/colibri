@@ -660,9 +660,20 @@ class APIHandler(BaseHTTPRequestHandler):
 
     def send_cors_headers(self):
         origin = self.headers.get("Origin")
-        if not origin or ("*" not in self.server.cors_origins and origin not in self.server.cors_origins):
+        if not origin:
             return
-        self.send_header("Access-Control-Allow-Origin", "*" if "*" in self.server.cors_origins else origin)
+        if "*" in self.server.cors_origins:
+            echoed = "*"
+        else:
+            # Never echo the request header; echo the matching allow-list entry.
+            # That way the value going into Access-Control-Allow-Origin is
+            # server-owned, so no CR/LF or other control char from the client
+            # can ever reach the response.
+            match = next((o for o in self.server.cors_origins if o == origin), None)
+            if match is None:
+                return
+            echoed = match
+        self.send_header("Access-Control-Allow-Origin", echoed)
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
         self.send_header("Access-Control-Expose-Headers",
